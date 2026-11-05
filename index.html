@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Triage Showdown · player</title>
+<style>
+:root{--bg:#0a0f1f;--panel:#141c36;--panel2:#1a2445;--line:#2a3762;--ink:#eef1fa;--ink2:#b9c1de;--muted:#8089ad;--accent:#8b5cf6;--accent2:#22d3ee;--green:#22c55e;--red:#ef4444}
+*{box-sizing:border-box;margin:0}
+body{min-height:100vh;background:radial-gradient(1200px 600px at 20% -10%,#2a1d5c 0,transparent 60%),radial-gradient(900px 500px at 110% 110%,#0c3b4f 0,transparent 60%),var(--bg);color:var(--ink);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;justify-content:center;padding:28px 16px}
+main{width:100%;max-width:520px}
+.top{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+.brand{font-weight:800;font-size:20px;letter-spacing:-.01em}
+.brand span{background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.conn{font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.conn i{width:9px;height:9px;border-radius:50%;background:var(--red)}
+.conn.on i{background:var(--green);box-shadow:0 0 8px var(--green)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:22px}
+.card.anim{animation:in .3s ease both}
+@keyframes in{from{transform:translateY(8px);opacity:0}to{transform:none;opacity:1}}
+h1{font-size:24px;line-height:1.2;margin-bottom:6px}
+p{color:var(--ink2)}
+.who{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.av{width:42px;height:42px;border-radius:50%;background:var(--pc);color:#fff;font-weight:800;font-size:18px;display:flex;align-items:center;justify-content:center;flex:0 0 42px}
+.who b{font-size:18px}
+.who button{margin-left:auto;background:none;border:0;color:var(--muted);text-decoration:underline;cursor:pointer;font-size:13px}
+.names{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px}
+.names button{display:flex;align-items:center;gap:10px;background:var(--panel2);border:1px solid var(--line);border-left:5px solid var(--pc);border-radius:14px;padding:14px;color:var(--ink);font:700 17px system-ui,sans-serif;cursor:pointer;text-align:left}
+.names button:hover{border-color:var(--pc)}
+.names small{display:block;font-size:12px;color:var(--muted);font-weight:600}
+.q{font-size:13px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--accent2);margin-bottom:4px}
+.dbl{display:inline-block;margin:6px 0 2px;font-weight:800;font-size:13px;color:#fff;background:linear-gradient(135deg,#ec4899,#8b5cf6);border-radius:999px;padding:3px 11px}
+.opts{display:grid;gap:12px;margin-top:16px}
+.opts button{height:78px;border-radius:16px;border:2px solid var(--line);background:var(--panel2);color:var(--ink);font:900 34px ui-monospace,Menlo,monospace;cursor:pointer;transition:transform .1s,border-color .2s,background .2s}
+.opts button:active{transform:scale(.97)}
+.opts button.sel{border-color:var(--accent);background:rgba(139,92,246,.28);box-shadow:0 0 0 3px rgba(139,92,246,.25)}
+.note{margin-top:14px;font-size:14px;color:var(--ink2)}
+.big{font-size:44px;line-height:1;margin-bottom:10px}
+.res.ok h1{color:var(--green)}.res.no h1{color:var(--red)}
+.stats{display:flex;gap:10px;margin-top:16px}
+.stats div{flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.stats small{display:block;font-size:12px;color:var(--muted)}
+.stats b{font-size:22px}
+.wait{display:flex;align-items:center;gap:10px;margin-top:16px;color:var(--muted);font-size:14px}
+.spin{width:16px;height:16px;border:3px solid rgba(139,92,246,.25);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.foot{margin-top:16px;text-align:center;font-size:12px;color:var(--muted)}
+</style>
+</head>
+<body>
+<main>
+  <div class="top"><div class="brand">Triage <span>Showdown</span> 🏁</div><div class="conn" id="conn"><i></i><span>Connecting…</span></div></div>
+  <div id="app"></div>
+  <div class="foot">Watch the shared screen for the questions. Answer here.</div>
+</main>
+<script>
+const P=[{n:'Jack',c:'#8b5cf6'},{n:'Harry',c:'#0ea5c6'},{n:'Bry',c:'#d27d0a'},{n:'Norvylle',c:'#ec4899'}];
+const k=new URLSearchParams(location.hash.slice(1)).get('k');
+const topic=k&&/^[a-z0-9]{6,32}$/.test(k)?'tsd-'+k:null;
+const RELAY='https://ntfy.sh/';
+let me=null,st=null,myPick=null,conn=false,lastJoin=0,lastKey='';
+try{const s=topic&&localStorage.getItem('tsd:'+k);if(P.some(p=>p.n===s))me=s;}catch(e){}
+const $=s=>document.querySelector(s),pc=n=>(P.find(p=>p.n===n)||{}).c;
+function send(o){o.f='p';return fetch(RELAY+topic,{method:'POST',body:JSON.stringify(o)}).catch(()=>{});}
+function join(){if(!me)return;lastJoin=Date.now();send({k:'join',n:me});}
+function choose(n){me=n;try{localStorage.setItem('tsd:'+k,n)}catch(e){}join();render();}
+function pick(o){if(!st||st.ph!=='ask')return;myPick=o;send({k:'pick',n:me,q:st.q,o});render();}
+function onState(m){if(!st||m.q!==st.q||(st.ph!=='ask'&&m.ph==='ask'))myPick=null;st=m;
+  if(me&&Array.isArray(m.joined)&&!m.joined.includes(me)&&Date.now()-lastJoin>4000)join();render();}
+function connect(){const es=new EventSource(RELAY+topic+'/sse');
+  es.onopen=()=>{conn=true;render();join();};
+  es.onerror=()=>{conn=false;render();};
+  es.onmessage=e=>{let d,m;try{d=JSON.parse(e.data);if(d.event&&d.event!=='message')return;m=JSON.parse(d.message);}catch(x){return;}
+    if(m&&m.f==='h'&&m.k==='state')onState(m);};}
+function render(){const c=$('#conn');c.classList.toggle('on',conn);c.querySelector('span').textContent=conn?'Connected':'Connecting…';
+  const app=$('#app');
+  if(!topic){app.innerHTML='<div class="card"><h1>This link has no game code</h1><p>Ask Dave for the game link from the meeting chat.</p></div>';return;}
+  if(!me){const taken=(st&&st.joined)||[];app.innerHTML='<div class="card"><h1>Who are you? 👋</h1><p>Tap your name to join the game.</p><div class="names">'+P.map(p=>`<button style="--pc:${p.c}" data-n="${p.n}"><span class="av">${p.n[0]}</span><span>${p.n}${taken.includes(p.n)?'<small>already joined</small>':''}</span></button>`).join('')+'</div></div>';
+    app.querySelectorAll('[data-n]').forEach(b=>b.onclick=()=>choose(b.dataset.n));return;}
+  const head=`<div class="who" style="--pc:${pc(me)}"><span class="av">${me[0]}</span><b>${me}</b><button id="chg">Not you?</button></div>`;
+  let body;
+  if(!st)body='<h1>You’re in! 🎉</h1><p>Waiting for Dave to start the game.</p><div class="wait"><span class="spin"></span>Watch the shared screen.</div>';
+  else if(st.ph==='ask')body=`<div class="q">Question ${st.q+1} of ${st.nq}</div>${st.dbl?'<span class="dbl">🎰 Double points</span>':''}<h1>Pick your answer</h1><p>Read the question on Dave’s screen.</p><div class="opts">${['A','B','C'].map((L,o)=>`<button data-o="${o}" class="${myPick===o?'sel':''}">${L}</button>`).join('')}</div>`
+    +(myPick===null?'':`<div class="note">🔒 Locked in: <b>${'ABC'[myPick]}</b>. You can change it until Dave shows the answer.</div>`);
+  else if(st.ph==='rev'){const r=(st.res||{})[me]||{};const R='ABC'[st.right];
+    body=r.pick===null||r.pick===undefined?`<div class="res"><div class="big">⏳</div><h1>No answer this time</h1><p>The answer was <b>${R}</b>.</p></div>`
+      :r.ok?`<div class="res ok"><div class="big">✅</div><h1>Right! +${r.pts}</h1><p>${r.fast?'⚡ Fastest right answer. ':''}The answer was <b>${R}</b>.</p></div>`
+      :`<div class="res no"><div class="big">❌</div><h1>Not this time</h1><p>You picked <b>${'ABC'[r.pick]}</b>. The answer was <b>${R}</b>.</p></div>`;
+    body+=`<div class="stats"><div><small>Your score</small><b>${r.score||0}</b></div><div><small>Streak</small><b>${r.stk>=2?'🔥 '+r.stk:r.stk||0}</b></div></div><div class="wait"><span class="spin"></span>Waiting for the next question.</div>`;}
+  else if(st.ph==='end'){const r=(st.rank||{})[me]||{r:4,s:0};const M=['🥇','🥈','🥉','🎖️'][Math.min(r.r,4)-1];
+    const t=r.r===1?(st.champs&&st.champs.length>1?'You share the crown! 👑':'You’re the Triage Champion! 👑'):r.r===2?'2nd place!':r.r===3?'3rd place!':'Thanks for playing!';
+    body=`<div class="res ok"><div class="big">${M}</div><h1>${t}</h1><p>Final score: <b>${r.s} pts</b></p></div><div class="wait">Look at Dave’s screen for the podium 🎉</div>`;}
+  else body='<h1>Hang on…</h1><p>Waiting for Dave.</p>';
+  const key=me+'|'+(st?st.ph+st.q:'-'),anim=key!==lastKey;lastKey=key;
+  app.innerHTML=`<div class="card${anim?' anim':''}">${head}${body}</div>`;
+  $('#chg').onclick=()=>{me=null;try{localStorage.removeItem('tsd:'+k)}catch(e){}render();};
+  app.querySelectorAll('.opts [data-o]').forEach(b=>b.onclick=()=>pick(+b.dataset.o));}
+render();if(topic)connect();
+</script>
+</body>
+</html>
